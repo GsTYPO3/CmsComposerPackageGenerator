@@ -283,8 +283,7 @@ class CreateTerExtensionJsonCommand extends \Symfony\Component\Console\Command\C
                     $linkType = 'suggest';
                     break;
                 default:
-                    continue;
-                    break;
+                    continue 2;
             }
 
             if ($dependency['extensionKey'] !== 'php'
