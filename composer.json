@@ -18,11 +18,13 @@
         "ext-json": "*",
         "ext-SimpleXML": "*",
         "ext-zlib": "*",
-        "composer/satis": "^1.0",
+        "composer/satis": "dev-master",
         "guzzlehttp/guzzle": "^6.5",
         "symfony/console": "*"
     },
     "require-dev": {
+        "friendsofphp/php-cs-fixer": "^2.16",
+        "overtrue/phplint": "^1.2",
         "symfony/debug-pack": "*",
         "symfony/maker-bundle": "*",
         "symfony/test-pack": "*",
@@ -40,9 +42,29 @@
     },
     "bin": ["bin/typo3-cms-package-generator"],
     "config": {
-        "bin-dir": "bin/",
+        "bin-dir": "bin",
         "platform": {
             "php": "7.4.3"
         }
+    },
+    "scripts": {
+        "test:php:cgl": [
+            "php-cs-fixer --diff -v fix --format=junit > php-cs-fixer.xml"
+        ],
+        "test:php:lint": [
+            "phplint"
+        ],
+        "test:php:unit": [
+            "phpunit -c ./Build/UnitTests.xml --log-junit phpunit-unit.xml --testsuite \"Unit Test Suite\"",
+            "phpunit -c phpunit.xml.dist --log-junit phpunit-unit2.xml --testsuite \"Unit Test Suite\""
+        ],
+        "test:php:functional": [
+            "phpunit -c phpunit.xml.dist --log-junit phpunit-functional.xml --testsuite \"Functional Test Suite\""
+        ],
+        "test": [
+            "@test:php:cgl",
+            "@test:php:lint",
+            "@test:php:unit"
+        ]
     }
 }

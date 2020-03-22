@@ -15,10 +15,11 @@ namespace TYPO3\Composer\Command;
  */
 
 use GuzzleHttp\Client;
+use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class CreateTerExtensionJsonCommand extends \Symfony\Component\Console\Command\Command
+class ExtensionsTerJsonCreateCommand extends \Symfony\Component\Console\Command\Command
 {
     /**
      * @var string
@@ -48,7 +49,7 @@ class CreateTerExtensionJsonCommand extends \Symfony\Component\Console\Command\C
     /**
      * @var string
      */
-    const JSON_FILE_PATH = '../Web/packages-TYPO3Extensions-{type}.json';
+    const JSON_FILE = 'packages-TYPO3Extensions-{type}.json';
 
     /**
      * @var array
@@ -61,7 +62,14 @@ class CreateTerExtensionJsonCommand extends \Symfony\Component\Console\Command\C
     protected $extensionKeys;
 
     /**
-     * Extensions in this array are marked as abandoned when users install them with typo3-ter/ext-key
+     * Extensions in this array are marked as abandoned when users install
+     * them with typo3-ter/ext-key. This array is autocreated with the
+     * information fetched from TER. Extensions providing a composer.json
+     * will be listed here and as result the author's version will be
+     * prefered over the package created here.
+     *
+     * Do not create pull requests for this list, simply provide a
+     * composer.json for your extension.
      *
      * @var array
      */
@@ -71,30 +79,44 @@ class CreateTerExtensionJsonCommand extends \Symfony\Component\Console\Command\C
     ];
 
     /**
+     * Location where to output built files.
+     *
+     * @var string
+     */
+    protected $outputDir;
+
+    /**
      * @return void
      */
     protected function configure()
     {
         $this
             ->setName('extensions:ter:json:create')
-            ->setDescription('Creates packages.json files from ' . static::TER_XML_PATH);
+            ->setDescription('Creates packages.json files from ' . static::TER_XML_PATH)
+            ->setDefinition([
+                new InputArgument('output-dir', InputArgument::OPTIONAL, 'Location where to output built files', './Web'),
+            ]);
     }
 
     /**
      * @param InputInterface $input
      * @param OutputInterface $output
      *
-     * @return void
+     * @return int 0 if everything went fine, or an exit code
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        $this->outputDir = realpath($input->getArgument('output-dir'));
+
         $this->fetchComposerNames();
         $extensions = $this->getExtensions();
         $packages = $this->getPackages($extensions);
 
         foreach ($packages as $type => $content) {
-            $this->save($type, ['packages' => $content]);
+            $output->writeln(sprintf('Successfully created "%s"', $this->save($type, ['packages' => $content])));
         }
+
+        return 0;
     }
 
     protected function fetchComposerNames()
@@ -298,9 +320,9 @@ class CreateTerExtensionJsonCommand extends \Symfony\Component\Console\Command\C
             $maxVersion = (isset($requiredVersion[1]) ? trim($requiredVersion[1]) : '');
 
             if ((
-                    (empty($minVersion) || $minVersion === '0.0.0' || $minVersion === '*')
+                (empty($minVersion) || $minVersion === '0.0.0' || $minVersion === '*')
                     && (empty($maxVersion) || $maxVersion === '0.0.0' || $maxVersion === '*')
-                )
+            )
                 || !preg_match('/^([\d]+\.[\d]+\.[\d]+)*(\-)*([\d]+\.[\d]+\.[\d]+)*$/', $dependency['versionRange'])
             ) {
                 $versionConstraint = '*';
@@ -323,11 +345,14 @@ class CreateTerExtensionJsonCommand extends \Symfony\Component\Console\Command\C
     /**
      * @param string $type
      * @param array $content
-     * @return void
+     * @return string
      */
     protected function save($type, array $content)
     {
-        file_put_contents($this->getJsonFilePath($type), json_encode($content));
+        $fileName = $this->getJsonFilePath($type);
+        file_put_contents($fileName, json_encode($content));
+
+        return $fileName;
     }
 
     /**
@@ -336,11 +361,14 @@ class CreateTerExtensionJsonCommand extends \Symfony\Component\Console\Command\C
      */
     protected function getJsonFilePath($type)
     {
-        $jsonFilePath = self::JSON_FILE_PATH;
+        $jsonFilePath = $this->outputDir . '/' . self::JSON_FILE;
         $jsonFilePath = str_replace('{type}', $type, $jsonFilePath);
+
+        /*
         if ($jsonFilePath[0] !== '/') {
             $jsonFilePath = dirname($_SERVER['PHP_SELF']) . '/' . $jsonFilePath;
         }
+        */
 
         return $jsonFilePath;
     }
@@ -363,6 +391,8 @@ class CreateTerExtensionJsonCommand extends \Symfony\Component\Console\Command\C
 
     /**
      * @param int $reviewState
+     * @param mixed $extKey
+     * @param mixed $owner
      * @return array
      */
     protected function evaluateExtensionState($extKey, $reviewState, $owner)
